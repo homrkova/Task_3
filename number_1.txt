@@ -1,0 +1,135 @@
+task1
+________________________________________________
+
+SELECT DISTINCT CustomerId, FirstName, Phone, Company, City, Email
+FROM (
+	/*Все чеки этих покупателей*/
+	SELECT *
+	FROM Invoice INNER JOIN(
+		/*Покупатели этих сотрудников*/
+		SELECT CustomerId, FirstName, Phone, Company, City, Email
+		FROM Customer INNER JOIN (
+			/*Все сотрудники старше 50 лет*/
+			SELECT BirthDate, EmployeeId
+			FROM Employee
+			WHERE date(BirthDate, '+50 years') <= date('now')
+		) AS t1
+		ON SupportRepId = t1.EmployeeId) AS t2
+	ON Invoice.CustomerId = t2.CustomerId) AS t4 
+INNER JOIN (
+	/*Все строчки из чека в которых есть эти треки*/
+	SELECT *
+	FROM InvoiceLine INNER JOIN(
+		/*Все треки жанры, которых не рок*/
+		SELECT *
+		FROM Track INNER JOIN Genre
+		ON Track.GenreId = Genre.GenreId
+		WHERE Genre.Name != 'Rock') AS t3
+	ON InvoiceLine.TrackId = t3.TrackId) AS t5
+ON t4.InvoiceId = t5.InvoiceId
+ORDER BY City ASC, Email DESC
+LIMIT 10;
+
+________________________________________________
+task2
+________________________________________________
+
+SELECT 
+	t1.LastName as EmployeeLastName, 
+	t1.FirstName as EmployeeFirstName, 
+	t1.Phone as EmployeePhone,
+	t2.LastName as ChiefLastName, 
+	t2.FirstName as ChiefFirstName, 
+	t2.Phone as ChiefPhone
+FROM Employee as t1
+INNER JOIN Employee as t2
+ON t1.EmployeeId = t2.ReportsTo;
+
+________________________________________________
+task3
+________________________________________________
+SELECT Customer.FirstName, Customer.Phone
+FROM Customer
+WHERE Customer.CustomerId IN (
+	/*Нашли id покупателей*/
+	SELECT DISTINCT CustomerId
+	FROM Invoice
+	INNER JOIN (
+		/*Id чеков с этими треками*/
+		SELECT InvoiceId
+		FROM InvoiceLine
+		INNER JOIN (
+			/*Id треков с максимальной ценой*/
+			Select TrackId
+			FROM Track
+			WHERE UnitPrice = (
+				/*Максимальная цена трека*/
+				SELECT MAX(UnitPrice)
+				FROM Track
+				WHERE UnitPrice)) AS t1 
+		ON InvoiceLine.TrackId = t1.TrackId) AS t2
+	ON Invoice.InvoiceId = t2.InvoiceId)
+ORDER BY FirstName ASC;
+
+________________________________________________
+task4 
+________________________________________________
+
+SELECT FirstName, LastName, Phone
+FROM (	
+	SELECT * 
+	FROM Customer
+	WHERE CustomerId IN (
+		SELECT DISTINCT CustomerId
+		FROM Invoice)
+	)
+WHERE City IN (
+	SELECT City
+	FROM (
+		SELECT City	
+		FROM Customer
+		WHERE CustomerId IN (
+			SELECT DISTINCT CustomerId
+			FROM Invoice
+		)
+	GROUP BY City
+	HAVING COUNT(City) > 1
+	)
+);
+
+________________________________________________
+task5
+________________________________________________
+
+SELECT BillingCity, SUM(Total) AS SumTotal
+FROM Invoice 
+GROUP BY BillingCity
+ORDER BY SumTotal DESC
+LIMIT 3;
+________________________________________________
+task6
+________________________________________________
+
+SELECT Genre.Name AS Genre, Track.Name AS Track, Album.Title AS Album, Artist.Name AS Artist 
+FROM Track
+INNER JOIN Genre
+ON Track.GenreId = Genre.GenreId
+INNER JOIN Album
+ON Track.AlbumId = Album.AlbumId
+INNER JOIN Artist
+ON Album.ArtistId = Artist.ArtistId
+WHERE Track.GenreId IN (
+	SELECT GenreId
+	FROM (	
+		SELECT GenreId, SUM(Summa) AS Sum2
+		FROM (
+			SELECT InvoiceLine.TrackId, Quantity, SUM(Quantity) AS Summa, GenreId
+			FROM InvoiceLine
+			INNER JOIN Track
+			ON InvoiceLine.TrackId = Track.TrackId 
+			GROUP BY InvoiceLine.TrackId)
+		GROUP BY GenreId
+		ORDER BY Sum2 DESC 
+		LIMIT 1
+	)
+);
